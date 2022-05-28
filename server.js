@@ -3,6 +3,7 @@ const http = require('http');
 const express = require('express');
 const socketio = require('socket.io');
 const formatMessage = require('./utils/messages');
+const { userJoin, getCurrentUser, userLeave, getRoomUsers } = require('./utils/users');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,21 +15,32 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Run when client connets
 io.on('connection', socket=> {
-  socket.emit('message', formatMessage(botName, 'Welcome to chatcord!'));
+  socket.on('joinRoom', ({ username, room })=> {
+    const user = userJoin(socket.id, username, room);
 
-  // MEMO: emit to everyone except the client that's connecting
-  // Broadcast when a user connects
-  socket.broadcast.emit('message', formatMessage(botName, 'A user has joined the chat')); 
+    socket.join(user.room);
 
-  socket.on('disconnect', ()=> { 
-    io.emit('message', formatMessage(botName, 'A user has left the chat'))
+    socket.emit('message', formatMessage(botName, 'Welcome to chatcord!'));
+
+    // Broadcast when a user connects
+    socket.broadcast.to(user.room).emit('message', formatMessage(botName, `${username} has joined the chat`));   
   })
 
   // Listen for chat message
   socket.on('chatMessage', msg => {
+    const user = getCurrentUser(socket.id);
+
     // Send message to client side
-    io.emit('message',formatMessage('USER', msg));
+    io.to(user.room).emit('message',formatMessage(user.username, msg));
   })
+
+  socket.on('disconnect', ()=> { 
+    const user = userLeave(socket.id);
+    if (user) {
+      io.to(user.room).emit('message', formatMessage(botName, `${user.username} has left the chat`))
+    }
+  })
+
 })
 
 const PORT = 3000 || process.env.PORT;

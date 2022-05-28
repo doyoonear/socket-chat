@@ -1,6 +1,15 @@
 const chatForm = document.getElementById('chat-form');
 const chatMessages = document.querySelector('.chat-messages');
+
+// GET username from URL
+const {username, room} = Qs.parse(location.search, {
+  ignoreQueryPrefix: true
+});
+
 const socket = io();
+// Join chatroom
+socket.emit('joinRoom', {username, room});
+
 
 // Get message from server
 socket.on('message', message => {
